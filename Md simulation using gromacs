@@ -1,0 +1,77 @@
+#Molecular dynamic simulation
+#Take complex.pdb and make a separate folder for simulation. Then, split ligand and protein with ligand name in taken pdb.
+	grep UNK LBK.pdb > UNK.pdb
+# Now, delete all ligands (heteroatom) from LBK.pdb.
+	gmx pdb2gmx -f LBK.pdb -o LBK_pro.gro
+# Now select force field as 9 (for gromos force field
+Water model – 1
+# After topology file (topol.top) is formed, make ligand.gro and ligand.itp file using PRODRG web server:
+•	Upload the UNK.pdb to PRODRG web server, put fresh token, and run it
+•	Download zip archive file, copy the file to simulation folder, extract it
+•	Now, from the extracted folder copy DRGGMX.ITP and DRGAPH.GRO to the simulation main folder and rename them as UNK.itp and UNK.gro respectively.
+•	Now, delete the zip archive file and extracted folder
+# Make complex.gro file from LBK_pro.gro and UNK.gro, and add the number of heteroatom added at the top of the .gro file. Then, include UNK.itp and UNK in topol.top file by adding
+; Include ligand topology
+#include "UNK.itp"
+# Above ;Include water topology in topol.top file and  add ligand
+[ molecules ]
+; Compound        #mols
+Protein_chain_A     1
+UNK               1
+gmx editconf -f complex.gro -o newbox.gro -bt triclinic -d 1.0
+gmx solvate -cp newbox.gro -cs spc216.gro -p topol.top -o solv.gro
+nano ions.mdp
+# Copy from md tutorial and paste
+# ‘control’ x and press Y (then enter)
+gmx grompp -f ions.mdp -c solv.gro -p topol.top -o ions.tpr
+gmx genion -s ions.tpr -o solv_ions.gro -p topol.top -pname NA -nname CL -neutral
+# Select 15(sol.)
+Nano em.mdp
+# Copy from md tutorial…….
+gmx grompp -f em.mdp -c solv_ions.gro -p topol.top -o em.tpr
+gmx mdrun -v -deffnm em
+gmx energy -f em.edr -o potential.xvg
+# type 10   0
+gmx make_ndx -f UNK.gro -o index_UNK.ndx
+> 0 & ! a H*
+> q
+gmx genrestr -f UNK.gro -n index_UNK.ndx -o posre_UNK.itp -fc 1000 1000 1000
+# Select 3
+gmx make_ndx -f em.gro -o index.ndx
+> 1 | 13
+> q
+Nano nvt.mdp
+# Copy from md tutorial, change the name of ligand (UNK)……….
+gmx grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -n index.ndx -o nvt.tpr
+gmx mdrun -deffnm nvt
+nano.npt.mdp
+# copy from md tutorial………
+gmx grompp -f npt.mdp -c nvt.gro -t nvt.cpt -r nvt.gro -p topol.top -n index.ndx -o npt.tpr
+gmx mdrun -deffnm npt
+nano md.mdp
+# Copy from md tutorial, change the name of ligand and set time (ns) of simulation……
+gmx grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -n index.ndx -o md_0_10.tpr
+gmx mdrun -deffnm md_0_10
+
+# If simulation stop without completion, command to run simulation from previous step
+gmx convert-tpr -s md_0_10.tpr -extend 200000 -o md_0_20.tpr
+nohup gmx mdrun -deffnm md_0_20 -cpi md_0_10.cpt -noappend
+
+# Analysis of MD simulation
+# First of all create new .xtc file
+gmx trjconv -s md_0_10.tpr -f md_0_10.xtc -pbc nojump -o md_0_100.xtc
+# Select system and backbone
+# RMSD
+gmx rms -s md_0_10.tpr -f md_0_100.xtc -o rms.xvg -tu ns
+#select backbone both time
+
+# RMSF
+gmx rmsf -s md_0_10.tpr -f md_0_100.xtc -res -o rms.xvg -tu ns
+# Radius of gyration
+gmx gyrate -s md_0_10.tpr -f md_0_100.xtc -o gyr.xvg -tu ns
+# SASA
+gmx sasa -s md_0_10.tpr -f Md_0_100.xtc -o sasa.xvg -b 2 -tu ns
+# Hydrogen bonding
+gmx hbond -s md_0_10.tpr -f md_0_100.xtc -n index.ndx -num Hbond.xvg -tu ns
+# Select protein and ligand
+
