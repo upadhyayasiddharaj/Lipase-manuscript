@@ -1,0 +1,51 @@
+# The Bio3D package in R will be used to compute the dynamic cross-correlation network of TK (Grant et al., 2006; Skjaerven et al., 2014). Although GROMACS offers the g_covar tool to generate a dynamics covariance matrix, additional post-processing is required to convert this output into a dynamic cross-correlation matrix. In contrast, Bio3D provides a more streamlined, user-friendly interface for analyzing biomolecular structure, sequence, and simulation data. It directly generates a matrix of atom-wise cross-correlation coefficients (Cᵢⱼ), which can be visualized as a dynamic cross-correlation matrix (DCCM) for easier interpretation.
+# Preparing trajectory file
+Since the trajectory files including .xtc file and .trr file from GROMACS are not supported by Bio3D, these files should be converted to DCD format, that are single precision binary FORTRAN files and accepted by the Bio3D. The trajectory files produced by CHARMM/NAMD are also in DCD format. Here, a tool called CatDCD (http://www.ks.uiuc.edu/ Development/MDTools/catdcd/) is used to transfer .xtc file to .dcd file .CatDCD functions much like the Unix “cat” command. It can concatenate DCD files into a single DCD file, write only selected atoms to the final DCD file and read/write any of the structure/trajectory formats that are supported by VMD (https://www.ks.uiuc.edu/Research/vmd/). CatDCD is now built as part of the VMD Plugin. To use CatDCD, just copy it over to the home directories and use this command in the command prompt:
+                             ./catdcd –o last10ns.dcd –xtc last10ns.xtc
+where the -o flag indicates output file, -xtc flag indicates the file format of the input file last10ns.xtc obtained from the GROMACS production simulation trajectory.
+# Loading Bio3D package
+**Bio3D** is a cross-platform R package compatible with **macOS, Linux, and Windows**. Installation instructions are available in the official tutorials at [http://thegrantlab.org/bio3d/tutorials/installing-bio3d](http://thegrantlab.org/bio3d/tutorials/installing-bio3d). To begin, launch R—either by typing `R` in a terminal or command prompt, or by double-clicking the R icon on Windows. Once R is running, you can load the **Bio3D** package using the following command at the R console:
+                            >library(bio3d)
+# Reading a trajectory file
+The trajectory file last10ns.dcd is now ready to be input into the Bio3D package by the following commands:
+                             > dcdfile <- “/path/to/dcd/file/last10ns.dcd”
+                             > dcd <- read.dcd(dcdfile)
+The trajectory file last10ns.dcd is initially assigned to the variable dcdfile. The read.dcd() function is then used to read this file, with the resulting data stored in a new object named dcd. You can verify this assignment using the following command:
+                           >print(dcd)
+The output of this command is:
+Total Frames#: 1001
+Total XYZs#: 60138, (Atoms#: 20046)
+[1] 33.52 65.21 30.84 <...> 65.04 41.75 78.91 [60198138]
++ attr: Matrix DIM = 1001 x 60138
+This indicates that there are 1001 frames in total in the trajectory, and that there are 20,046 atoms and 60,138 coordinates in each frame.
+ # Reading the starting PDB file
+A PDB file needs to be read to determine atom correspondence by the following commands:
+                        >pdbfile <- "/path/to/pdb/file/1LPB.pdb”
+                        > pdb <- read.pdb(pdbfile)
+The simulation initial structure 1QGD.pdb is first assigned to the object pdbfile. The function read.pdb() then processes the PDB structure and returns its output to the new object pdb. This object can be checked by the following command:
+                       > print(pdb)
+Call: read.pdb(file = pdbfile)
+Total Models#: 1
+Total Atoms#: 20046, XYZs#: 60138 Chains#: 2 (values: A B)
+Protein Atoms#: 20046 (residues/Calpha atoms#: 1324)
+Nucleic acid Atoms#: 0 (residues/phosphate atoms#: 0)
+Non-protein/nucleic Atoms#: 0 (residues: 0)
+Non-protein/nucleic resid values: [ none ]
+Protein sequence:
+SSRKELANAIRALSMDAVQKAKSGHPGAPMGMADIAEVLWRDFLKHNPQNPSWADRDRFV
+LSNGHGSMLIYSLLHLTGYDLPMEELKNFRQLHSKTPGHPEVGKTAGVETTTGPLGQGIA
+NAVGMAIAEKTLAAQFNRPGHDIVDHYTYAFMGDGCMMEGISHEVCSLAGTLKLGKLIAF
+YDDNGISIDGHVEGWFTDDTAMRFEAYGWHVIRDIDGHDAASIKR...<cut>...KELL
++ attr: atom, xyz, calpha, call
+The output indicates the information about the PDB structure including atom number, chain number, non-protein atoms and protein sequence.
+# Superposing trajectory frames
+In this step, the frames in the trajectory will be superposed. The interesting atoms will be first identified by using the function atom.select().
+                               > ca.inds <- atom.select(pdb, elety5“CA”)
+Here, all the C-alpha atoms are selected. The returned object ca.inds is a list containing atom and xyz numeric indices that we can now use to superpose all frames of the trajectory on the selected indices. For this, the fit.xyz() function will be used.
+                              > xyz <- fit.xyz(fixed5pdb$xyz, mobile5dcd, fixed.inds5ca.inds$xyz, mobile.inds5ca.inds$xyz)
+The above command performs the actual superposition and stores the new coordinates in the matrix object xyz.
+# Running cross-correlation analysis
+The function dccm() will be used to calculate the cross-correlation matrices and this function will return a matrix of all atom-wise cross-correlations. The command is:
+                             > cij <- dccm(xyz[, ca.inds$xyz])
+The function dccm() calculates the DCCM using the above object xyz as the input and returns its output to the new object cij. The DCCM can bevisualized by using the command:
+                            > plot(cij)
